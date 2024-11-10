@@ -7,6 +7,7 @@ else
 endif
 
 container:=podman
+CMD:='--version'
 
 .PHONY: all
 all: build
@@ -30,6 +31,10 @@ bf:
 .PHONY: bfm
 bfm:
 	@$(container) run --rm -v $$PWD:/project -w /project -u $$UID --userns=keep-id -e HOME=/tmp --device=$(ESP32_TTY):$(ESP32_TTY) espressif/idf idf.py build flash monitor
+
+.PHONY: idf
+idf:
+	@$(container) run --rm -v $$PWD:/project -w /project -u $$UID --userns=keep-id -e HOME=/tmp --device=$(ESP32_TTY):$(ESP32_TTY) espressif/idf idf.py $(CMD)
 
 .PHONY: clean
 clean:
