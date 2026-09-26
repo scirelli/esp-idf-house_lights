@@ -1,62 +1,84 @@
-#include <stdio.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "driver/gpio.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 #include "esp_log.h"
-#include "led_strip.h"
-#include "sdkconfig.h"
+#include "driver/gpio.h"
+#include "neopixel.h"
 
+#define TAG "neopixel_test"
+#define PIXEL_COUNT  256
+#define NEOPIXEL_PIN GPIO_NUM_5
 
-#define PIXEL_PIN GPIO_NUM_5
-#define NUM_LEDS 8
+#if !defined(MAX)
+#define MAX(x, y) ((x) > (y) ? (x) : (y))
+#endif
+#define ARRAY_SIZE(x) (sizeof(x)/sizeof(x[0]))
 
-static const char *TAG = "example";
-static uint8_t s_led_state = 0;
-static led_strip_handle_t led_strip;
-
-static void blink_led(void)
+static bool test1(uint32_t iterations)
 {
-    if (s_led_state) {
-        led_strip_set_pixel(led_strip, 0, 106, 16, 16);
-        led_strip_set_pixel(led_strip, 1, 16, 16, 16);
-        led_strip_set_pixel(led_strip, 2, 16, 16, 16);
-        led_strip_set_pixel(led_strip, 3, 16, 16, 16);
-        led_strip_set_pixel(led_strip, 4, 16, 16, 16);
-        led_strip_set_pixel(led_strip, 5, 16, 16, 16);
-        led_strip_set_pixel(led_strip, 6, 16, 16, 16);
-        led_strip_set_pixel(led_strip, 7, 106, 16, 16);
-        led_strip_refresh(led_strip);
-    } else {
-        led_strip_clear(led_strip);
-    }
+   tNeopixelContext neopixel = neopixel_Init(PIXEL_COUNT, NEOPIXEL_PIN);
+   tNeopixel pixel[] =
+   {
+       { 0, NP_RGB(50, 0,  0) }, /* red */
+       { 0, NP_RGB(0,  50, 0) }, /* green */
+       { 0, NP_RGB(0,  0, 50) }, /* blue */
+       { 0, NP_RGB(0,  0,  0) }, /* off */
+   };
+
+   if(NULL == neopixel)
+   {
+      ESP_LOGE(TAG, "[%s] Initialization failed\n", __func__);
+      return false;
+   }
+
+   ESP_LOGI(TAG, "[%s] Starting", __func__);
+   for(int iter = 0; iter < iterations; ++iter)
+   {
+      for(int i = 0; i < ARRAY_SIZE(pixel); ++i)
+      {
+         neopixel_SetPixel(neopixel, &pixel[i], 1);
+         vTaskDelay(pdMS_TO_TICKS(200));
+      }
+   }
+   ESP_LOGI(TAG, "[%s] Finished", __func__);
+
+   neopixel_Deinit(neopixel);
+   return true;
 }
 
-static void configure_led(void)
+static bool test2(uint32_t iterations)
 {
-    ESP_LOGI(TAG, "Example configured to blink addressable LED!");
-    led_strip_config_t strip_config = {
-        .strip_gpio_num = PIXEL_PIN,
-        .max_leds = NUM_LEDS,
-        .led_pixel_format = LED_PIXEL_FORMAT_GRB,
-        .led_model = LED_MODEL_WS2812,
-        .flags.invert_out = false,
-    };
-    led_strip_rmt_config_t rmt_config = {
-        .resolution_hz = 10 * 1000 * 1000, // 10MHz
-        .flags.with_dma = false,
-    };
-    ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &led_strip));
-    led_strip_clear(led_strip);
+   tNeopixelContext neopixel = neopixel_Init(PIXEL_COUNT, NEOPIXEL_PIN);
+   uint32_t refreshRate, taskDelay;
+
+   if(NULL == neopixel)
+   {
+      ESP_LOGE(TAG, "[%s] Initialization failed\n", __func__);
+      return false;
+   }
+
+   refreshRate = neopixel_GetRefreshRate(neopixel);
+   taskDelay = MAX(1, pdMS_TO_TICKS(1000UL / refreshRate));
+   ESP_LOGI(TAG, "[%s] Starting", __func__);
+   for(int i = 0; i < iterations * PIXEL_COUNT; ++i)
+   {
+      tNeopixel pixel[] =
+      {
+          { (i)   % PIXEL_COUNT, NP_RGB(0, 0,  0) },
+          { (i+5) % PIXEL_COUNT, NP_RGB(0, 50, 0) }, /* green */
+      };
+      neopixel_SetPixel(neopixel, pixel, ARRAY_SIZE(pixel));
+      vTaskDelay(taskDelay);
+   }
+   ESP_LOGI(TAG, "[%s] Finished", __func__);
+   neopixel_Deinit(neopixel);
+   return true;
 }
 
 void app_main(void)
 {
-    configure_led();
-
-    while (1) {
-        ESP_LOGI(TAG, "Turning the LED %s!", s_led_state == true ? "ON" : "OFF");
-        blink_led();
-        s_led_state = !s_led_state;
-        vTaskDelay(CONFIG_BLINK_PERIOD / portTICK_PERIOD_MS);
-    }
+   for(;;)
+   {
+      test1(10);
+      test2(10);
+   }
 }

@@ -19,3 +19,10 @@ podman run --rm -v $PWD:/project -w /project -u $UID --userns=keep-id -e HOME=/t
 ```
 podman run -it --rm -v $PWD:/project -w /project -u $UID --userns=keep-id -e HOME=/tmp --device=/dev/ttyUSB0:/dev/ttyUSB0 espressif/idf idf.py monitor
 ```
+
+## Notes
+
+Power:
+* via the microUSB/USB C port (obviously)
+* via 5v to the VIN pin on the board
+* via 3.3v to the 3v3 pin
